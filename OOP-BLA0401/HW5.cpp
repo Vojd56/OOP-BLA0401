@@ -1,164 +1,189 @@
-#include <iostream>   // vstup/výstup do konzole
-#include <vector>     // dynamické pole (zásobník)
-#include <string>     // práce s textem
-#include <sstream>    // stringstream – rozdělení stringu
-#include <random>     
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <sstream>
+#include <random>
 
 class Card {
-private:
-    std::string barva;   // barva karty
-    std::string cislo;   // číslo / hodnota karty
-
 public:
-    // Konstruktor – vytvoří kartu s danou barvou a číslem
-    Card(const std::string& barva, const std::string& cislo)
-        : barva(barva), cislo(cislo) {}
+    std::string barva;
+    std::string cislo;
 
-    // Vrátí barvu karty
-    std::string getBarva() const {
-        return barva;
-    }
+    Card() {}
 
-    // Vrátí číslo karty
-    std::string getCislo() const {
-        return cislo;
-    }
+    Card(const std::string& b, const std::string& c)
+        : barva(b), cislo(c) {}
 
-    // Vrátí textovou reprezentaci karty (např. "7 Srdce")
     std::string toString() const {
         return cislo + " " + barva;
     }
 };
-class CardStack {
+
+class DynamicArray {
 private:
-    // Vnitřní pole zásobníku (poslední prvek = vrchol)
-    std::vector<Card> data;
+    Card* array;          
+    int elementCount;     
+    int capacity;    
+    static const int defaultSize = 10;
 
 public:
-    /*
-     * Přidá kartu na vrchol zásobníku
-     */
+    // Konstruktor bez parametrů
+    DynamicArray() {
+        capacity = defaultSize;
+        elementCount = 0;
+        array = new Card[capacity];
+    }
+
+    // Destruktor
+    ~DynamicArray() {
+        delete[] array;
+    }
+
+    // Vrátí prvek na indexu
+    Card getAt(int index) const {
+        if (index < 0 || index >= elementCount)
+            throw std::out_of_range("Index mimo rozsah");
+        return array[index];
+    }
+
+    // Nastaví prvek na indexu
+    void setAt(int index, const Card& value) {
+        if (index < 0 || index >= elementCount)
+            throw std::out_of_range("Index mimo rozsah");
+        array[index] = value;
+    }
+
+    // Přidání prvku na konec pole
+    void Add(const Card& value) {
+        if (elementCount == capacity) {
+            capacity *= 2;
+            Card* newArray = new Card[capacity];
+            for (int i = 0; i < elementCount; i++)
+                newArray[i] = array[i];
+            delete[] array;
+            array = newArray;
+        }
+        array[elementCount++] = value;
+    }
+
+    // Odebrání prvku na indexu
+    Card removeAt(int index) {
+        if (index < 0 || index >= elementCount)
+            throw std::out_of_range("Index mimo rozsah");
+
+        Card removed = array[index];
+        for (int i = index; i < elementCount - 1; i++)
+            array[i] = array[i + 1];
+
+        elementCount--;
+        return removed;
+    }
+
+    int size() const {
+        return elementCount;
+    }
+
+    // Přístup pro iterátor
+    Card* getRawArray() const {
+        return array;
+    }
+};
+
+class CardStack {
+private:
+    DynamicArray data;
+
+public:
+    // push – přidání karty
     void push(const Card& card) {
-        data.push_back(card);
+        data.Add(card);
     }
 
-    /*
-     * Odebere a vrátí kartů z vrcholu zásobníku
-     */
+    // pop – odebrání karty z vrcholu
     Card pop() {
-        Card top = data.back(); // vezmeme poslední kartu
-        data.pop_back();        // odstraníme ji
-        return top;
+        return data.removeAt(data.size() - 1);
     }
 
-     // Vrátí kartu z vrcholu bez odebrání
-
+    // peek – nahlédnutí na vrchol
     Card peek() const {
-        return data.back();
+        return data.getAt(data.size() - 1);
     }
 
     void Shuffle() {
-        std::random_device rd;    // zdroj náhodnosti
-        std::mt19937 gen(rd());   // generátor
+        std::random_device rd;
+        std::mt19937 gen(rd());
 
-        // Jdeme od konce pole směrm na začátek
         for (int i = data.size() - 1; i > 0; i--) {
-            // vygenerujeme náhodný index <0, i>
             std::uniform_int_distribution<int> dist(0, i);
             int j = dist(gen);
 
-            // prohodíme karty
-            std::swap(data[i], data[j]);
+            Card tmp = data.getAt(i);
+            data.setAt(i, data.getAt(j));
+            data.setAt(j, tmp);
         }
-    }
-
-    const std::vector<Card>* getData() const {
-        return &data;
     }
 
     static CardStack* createSevenToAceDeck() {
         CardStack* stack = new CardStack();
 
-        // Stringy s barvami a čísly, oddělené mezerou
         std::string barvy = "Srdce Kary Piky Krize";
         std::string cisla = "7 8 9 10 J Q K A";
 
-        // Rozdělení stringů pomocí stringstream
         std::stringstream ssBarvy(barvy);
         std::stringstream ssCisla(cisla);
 
-        std::vector<std::string> poleBarev;
-        std::vector<std::string> poleCisel;
+        std::string b, c;
 
-        std::string temp;
-
-        // Naplnění pole barev
-        while (ssBarvy >> temp)
-            poleBarev.push_back(temp);
-
-        // Naplnění pole čísel
-        while (ssCisla >> temp)
-            poleCisel.push_back(temp);
-
-        // Vytvoření všech kombinací barva + číslo
-        for (const auto& b : poleBarev) {
-            for (const auto& c : poleCisel) {
+        while (ssBarvy >> b) {
+            std::stringstream tempCisla(cisla);
+            while (tempCisla >> c) {
                 stack->push(Card(b, c));
             }
         }
 
         return stack;
     }
+
+    // Pro iterátor
+    DynamicArray* getData() {
+        return &data;
+    }
 };
 
 class CardStackIterator {
 private:
-    const std::vector<Card>* data; // data zásobníku
-    int index;                     // aktuální pozice
+    DynamicArray* data;
+    int index;
 
 public:
-    // Konstruktor – přijme pointer na pole karet
-    CardStackIterator(const std::vector<Card>* data)
-        : data(data), index(0) {}
+    CardStackIterator(DynamicArray* d)
+        : data(d), index(0) {}
 
-    /*
-     * Vrátí true, pokud existuje další prvek
-     */
     bool hasNext() {
         return index < data->size();
     }
 
-    /*
-     * Vrátí další kartu a posune index
-     */
     Card Next() {
-        return (*data)[index++];
+        return data->getAt(index++);
     }
 };
 
 int main() {
-    std::cout << "Vytvarim balicek karet pro hru Prsi...\n\n";
+    std::cout << "Vytvarim balicek pro hru Prsi...\n\n";
 
-    // Vytvoření balíčku
     CardStack* stack = CardStack::createSevenToAceDeck();
 
     std::cout << "Micham balicek...\n\n";
-
-    // Zamíchání balíčku
     stack->Shuffle();
 
     std::cout << "Vypis zamichaneho balicku:\n\n";
 
-    // Vytvoření iterátoru
-    CardStackIterator iterator(stack->getData());
+    CardStackIterator it(stack->getData());
 
-    // Výpis všech karet
-    while (iterator.hasNext()) {
-        Card card = iterator.Next();
-        std::cout << card.toString() << std::endl;
+    while (it.hasNext()) {
+        std::cout << it.Next().toString() << std::endl;
     }
 
-    // Uvolnění paměti
     delete stack;
     return 0;
 }
